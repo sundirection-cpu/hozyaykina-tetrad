@@ -4,8 +4,15 @@
 
 const KEY = 'hozyayka-tetrad-v1';
 const DAYS = ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
-const MEALS = ['Завтрак','Обед','Ужин'];
-const RCATS = { breakfast:'Завтраки', main:'Обеды и ужины', snack:'Перекусы', prep:'Заготовки' };
+const RCATS = { breakfast:'Завтраки', main:'Обеды и ужины', sweet:'Сладкое к кофе', snack:'Перекусы и салаты', drink:'Напитки', prep:'Заготовки' };
+const MEAL_CATS = ['breakfast','main','sweet','snack','drink'];
+// Приёмы пищи по умолчанию. light — «лёгкий» приём (норма бюджета вдвое меньше).
+const DEFAULT_SLOTS = () => [
+  { id:'b', name:'Завтрак', cat:'breakfast', on:true },
+  { id:'l', name:'Обед', cat:'main', on:true },
+  { id:'c', name:'Кофе со сладким', cat:'sweet', on:true, light:true },
+  { id:'d', name:'Ужин', cat:'main', on:true },
+];
 const PCATS = ['Овощи и фрукты','Крупы и макароны','Мясо и рыба','Молочное и яйца','Хлеб и бакалея','Другое'];
 const UNITS = ['кг','г','л','мл','шт','упак','банка','пучок'];
 // Подсказки «что сделать заранее» по разделу продукта
@@ -79,27 +86,57 @@ function seed(){
       items:[it('potato',1),it('chicken',350),it('cabbage',0.3),it('cucumber',0.2)],
       steps:'Картошку отварить или запечь.\nКурицу нарезать и обжарить.\nКапусту нашинковать, огурец нарезать, посолить.' },
   ];
-  const s = { v:1, settings:{ budget:500, people:4, currency:'R$' }, products, recipes, plan:{}, bought:{}, notes:'' };
-  autofill(s);
+  return { v:2, settings:{ budget:500, people:4, currency:'R$', slots:DEFAULT_SLOTS() }, products, recipes, plan:{}, bought:{}, notes:'' };
+}
+
+// Старый формат (3 приёма, plan['d-0'] = id) → слоты и списки блюд
+function migrate(s){
+  if(!s.settings.slots){
+    s.settings.slots = DEFAULT_SLOTS();
+    const map = { 0:'b', 1:'l', 2:'d' }, np = {};
+    for(const k in s.plan){ const [d, m] = k.split('-'); if(map[m] && s.plan[k]) np[`${d}-${map[m]}`] = s.plan[k]; }
+    s.plan = np;
+  }
+  for(const k in s.plan){ if(!Array.isArray(s.plan[k])) s.plan[k] = [s.plan[k]]; }
+  s.v = 2;
   return s;
 }
 
 const shuffle = a => { a = [...a]; for(let i=a.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; };
-function autofill(s, mix){
-  let br = s.recipes.filter(r=>r.cat==='breakfast'), mn = s.recipes.filter(r=>r.cat==='main');
-  if(mix){ br = shuffle(br); mn = shuffle(mn); }
-  for(let d=0; d<7; d++){
-    if(br.length) s.plan[`${d}-0`] = br[d % br.length].id;
-    if(mn.length){ s.plan[`${d}-1`] = mn[(d*2) % mn.length].id; s.plan[`${d}-2`] = mn[(d*2+1) % mn.length].id; }
+
+// Разложить блюда на неделю: максимум разнообразия, и чтобы влезло в бюджет.
+// Пробуем много случайных раскладок и берём первую, что уложилась (или самую дешёвую).
+function autofill(tries = 300){
+  const act = slots(), drinks = S.recipes.filter(r => r.cat === 'drink');
+  const pool = c => S.recipes.filter(r => r.cat === c);
+  let best = null, bestTotal = Infinity;
+  for(let t = 0; t < tries; t++){
+    const plan = {}, bags = {}; let total = 0;
+    const next = c => { const p = pool(c); if(!p.length) return null; if(!bags[c]?.length) bags[c] = shuffle(p); return bags[c].pop(); };
+    for(let d = 0; d < 7; d++){
+      const today = new Set();
+      for(const sl of act){
+        let r = next(sl.cat); if(r && today.has(r.id)) r = next(sl.cat);
+        if(!r) continue; today.add(r.id);
+        const ids = [r.id]; if(sl.cat === 'sweet' && drinks.length) ids.push(drinks[0].id);
+        plan[`${d}-${sl.id}`] = ids;
+        total += ids.reduce((s, id) => s + mealCost(R(id), slotPeople(sl)), 0);
+      }
+    }
+    if(total < bestTotal){ best = plan; bestTotal = total; }
+    if(total <= S.settings.budget){ best = plan; break; }
   }
+  // приёмы, которые сейчас выключены, не трогаем
+  const keep = {}; for(const k in S.plan){ const sid = k.split('-')[1]; if(!act.some(x => x.id === sid)) keep[k] = S.plan[k]; }
+  S.plan = { ...keep, ...(best || {}) };
 }
 
 /* ---------- состояние ---------- */
-let S;
+let S, fresh = false;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e) {}
-if(!S || !S.products) S = seed();
+if(!S || !S.products){ S = seed(); fresh = true; }
+migrate(S);
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e) {} };
-save();
 
 /* ---------- расчёты ---------- */
 const P = id => S.products.find(p => p.id === id);
@@ -112,17 +149,24 @@ function itemCost(it, depth=0){
   const p = P(it.ref); return p ? unitPrice(p) * it.qty : 0;
 }
 const recipeCost = (r, depth=0) => r.items.reduce((s,it) => s + itemCost(it, depth), 0);
-const mealFactor = r => S.settings.people / (r.serves || 1);
-const mealCost = r => recipeCost(r) * mealFactor(r);
+const mealFactor = (r, people = S.settings.people) => people / (r.serves || 1);
+const mealCost = (r, people) => recipeCost(r) * mealFactor(r, people);
+const slots = () => S.settings.slots.filter(x => x.on);
+const slotPeople = sl => sl.people || S.settings.people;
+const slotWeight = sl => (sl.light ? 0.5 : 1) * slotPeople(sl) / Math.max(1, S.settings.people);
+// Норма бюджета на один приём: делим недельный бюджет по «весам» приёмов
+function normFor(sl){ const W = slots().reduce((s, x) => s + slotWeight(x), 0); return W ? S.settings.budget / 7 / W * slotWeight(sl) : 0; }
 const refName = ref => isPrepRef(ref) ? (R(ref.slice(2))?.name ?? '—') : (P(ref)?.name ?? '—');
 const refUnit = ref => isPrepRef(ref) ? 'партия' : (P(ref)?.unit ?? '');
 
 function plannedMeals(){
   const out = [];
-  for(let d=0; d<7; d++) for(let m=0; m<3; m++){ const r = R(S.plan[`${d}-${m}`]); if(r) out.push({d,m,r}); }
+  for(let d=0; d<7; d++) for(const sl of slots()) for(const id of (S.plan[`${d}-${sl.id}`] || [])){
+    const r = R(id); if(r) out.push({ d, sl, r, people: slotPeople(sl) });
+  }
   return out;
 }
-const weekTotal = () => plannedMeals().reduce((s,x) => s + mealCost(x.r), 0);
+const weekTotal = () => plannedMeals().reduce((s,x) => s + mealCost(x.r, x.people), 0);
 
 // Что нужно на неделю: продукты, заготовки, сколько раз встречается
 function weekNeeds(){
@@ -139,7 +183,7 @@ function weekNeeds(){
       }
     }
   };
-  for(const {r} of plannedMeals()) add(r.items, mealFactor(r), 0);
+  for(const {r, people} of plannedMeals()) add(r.items, mealFactor(r, people), 0);
   return { need, preps, uses };
 }
 const packsFor = (p, q) => p.pack > 0 ? Math.ceil(q / p.pack - 1e-9) : 0;
@@ -157,23 +201,27 @@ function render(){
   $('#tabs').innerHTML = TABS.map(([k,t,ic]) => `<a href="#${k}" class="tab tab-${k} ${k===tab?'on':''}">${icon(ic)}<span>${t}</span></a>`).join('');
 }
 
+const tagsHtml = tags => tags?.length ? `<span class="tags">${tags.map(t => `<i>${esc(t)}</i>`).join('')}</span>` : '';
 function header(title, extra=''){
   return `<header class="head"><h1>${title}</h1>${extra}</header>`;
 }
 
 /* --- Неделя --- */
-function recipeOptions(sel){
+function recipeOptions(sel, first){
   let h = `<option value="">— не выбрано —</option>`;
-  for(const c of ['breakfast','main','snack']){
+  for(const c of [first, ...MEAL_CATS.filter(c => c !== first)]){
     const rs = S.recipes.filter(r => r.cat === c); if(!rs.length) continue;
     h += `<optgroup label="${RCATS[c]}">` + rs.map(r => `<option value="${r.id}" ${r.id===sel?'selected':''}>${esc(r.name)}</option>`).join('') + `</optgroup>`;
   }
   return h;
 }
+const cnt = (n, a, b, c) => `${n} ${plural(n, a, b, c)}`;
 
 function vWeek(){
-  const st = S.settings, total = weekTotal(), left = st.budget - total;
-  const norm = st.budget / 21, perPerson = st.budget / 7 / Math.max(1, st.people);
+  const st = S.settings, act = slots(), total = weekTotal(), left = st.budget - total;
+  const mainNorm = act.find(x => !x.light) ? normFor(act.find(x => !x.light)) : 0;
+  const lightSl = act.find(x => x.light);
+  const perPerson = st.budget / 7 / Math.max(1, st.people);
   const pct = st.budget > 0 ? Math.min(100, total / st.budget * 100) : 0;
   const over = left < 0;
   let h = header('Хозяйкина тетрадь', `<button class="icon-btn" data-act="settings" aria-label="Настройки">⚙</button>`);
@@ -182,26 +230,33 @@ function vWeek(){
     <h2>Бюджет на неделю</h2>
     <label class="line">Бюджет: <input class="ink-in w5" inputmode="decimal" data-f="budget" value="${fmt(st.budget)}"> ${esc(st.currency)}</label>
     <label class="line">Едоков: <input class="ink-in w2" inputmode="numeric" data-f="people" value="${st.people}"> чел.</label>
-    <p class="pencil">7 завтраков + 7 обедов + 7 ужинов = 21 приём пищи</p>
-    <p>На один приём: <b class="hl">${money(norm)}</b><br><span class="pencil">≈ ${money(perPerson)} на человека в день</span></p>
+    <p class="pencil">${act.map(x => esc(x.name.toLowerCase())).join(' · ')} — ${cnt(act.length*7,'приём','приёма','приёмов')} за неделю
+      <button class="linkbtn" data-act="settings">изменить</button></p>
+    <p>На обед или ужин: <b class="hl">${money(mainNorm)}</b>${lightSl ? `<br>На «${esc(lightSl.name.toLowerCase())}»: <b>${money(normFor(lightSl))}</b>` : ''}<br>
+      <span class="pencil">≈ ${money(perPerson)} на человека в день</span></p>
     <div class="bar ${over?'over':''}"><i style="width:${pct}%"></i></div>
     <table class="sum"><tr><td>Запланировано</td><td class="r">${money(total)}</td></tr>
     <tr><td>${over?'Перерасход':'Остаток'}</td><td class="r ${over?'red':'green'}"><b>${money(Math.abs(left))}</b></td></tr></table>
     ${over ? '<div class="stamp">Перерасход!</div>' : ''}
   </section>
-  <div class="tools"><button class="btn" data-act="autofill">↻ Заполнить по кругу</button><button class="btn ghost" data-act="clearplan">Очистить</button></div>`;
+  <div class="tools"><button class="btn" data-act="autofill">↻ Разложить в бюджет</button><button class="btn ghost" data-act="clearplan">Очистить</button></div>`;
   for(let d=0; d<7; d++){
     let ds = 0, rows = '';
-    for(let m=0; m<3; m++){
-      const r = R(S.plan[`${d}-${m}`]); const c = r ? mealCost(r) : 0; ds += c;
-      rows += `<div class="meal"><span class="mname">${MEALS[m]}</span>
-        <select class="ink-sel" data-slot="${d}-${m}">${recipeOptions(r?.id)}</select>
-        <span class="mcost ${r && c > norm ? 'red' : ''}">${r ? fmt(c) : ''}</span>
-        ${r ? `<a class="go" href="#recipe/${r.id}" aria-label="Открыть рецепт">→</a>` : '<span class="go"></span>'}</div>`;
+    for(const sl of act){
+      const key = `${d}-${sl.id}`, ids = S.plan[key]?.length ? S.plan[key] : [''];
+      const sc = ids.reduce((s, id) => s + (R(id) ? mealCost(R(id), slotPeople(sl)) : 0), 0); ds += sc;
+      const red = sc > normFor(sl) * 1.001;
+      rows += ids.map((id, i) => { const r = R(id), c = r ? mealCost(r, slotPeople(sl)) : 0;
+        return `<div class="meal ${i ? 'extra' : ''}"><span class="mname">${i ? '' : esc(sl.name)}${!i && sl.people ? `<small>${sl.people} чел.</small>` : ''}</span>
+        <select class="ink-sel" data-slot="${key}" data-i="${i}">${recipeOptions(r?.id, sl.cat)}</select>
+        <span class="mcost ${r && red ? 'red' : ''}">${r ? fmt(c) : ''}</span>
+        <span class="acts">${r ? `<a class="go" href="#recipe/${r.id}" aria-label="Открыть рецепт">→</a>` : ''}${i
+          ? `<button class="mini-btn x" data-act="deldish" data-key="${key}" data-i="${i}" aria-label="Убрать блюдо">×</button>`
+          : (r ? `<button class="mini-btn" data-act="adddish" data-key="${key}" aria-label="Добавить блюдо в этот приём">+</button>` : '')}</span></div>`; }).join('');
     }
     h += `<section class="day"><h2>${DAYS[d]} <span class="daysum">${ds ? money(ds) : ''}</span></h2>${rows}</section>`;
   }
-  h += `<p class="pencil foot">Красным — приёмы дороже нормы ${money(norm)}. Цены меняются на закладке «Цены», всё пересчитается само.</p>`;
+  h += `<p class="pencil foot">Красным — приёмы дороже нормы. «+» — добавить второе блюдо в приём (например, салат к супу или кофе к пирогу). Пироги и супы на 6–10 порций считаются частями: одна выпечка — на 2–3 раза.</p>`;
   return h;
 }
 
@@ -211,12 +266,12 @@ function vRecipes(){
   const fresh = LIB.recipes.filter(lr => !inBook(lr)).length;
   h += `<a class="card libbanner" href="#library">${sketch('pancakes','float')}<h2>Книга рецептов</h2>
     <p>${fresh ? `${fresh} недорогих домашних блюд — добавляйте в тетрадь одним нажатием →` : 'Все блюда из книги уже в тетради ✓'}</p></a>`;
-  for(const c of ['breakfast','main','snack','prep']){
+  for(const c of Object.keys(RCATS)){
     const rs = S.recipes.filter(r => r.cat === c); if(!rs.length) continue;
     h += `<h2 class="sec">${RCATS[c]}</h2><div class="grid">`;
     h += rs.map((r,i) => `<a class="rcard" href="#recipe/${r.id}" style="--tilt:${(i%3-1)*0.8}deg">
       ${sketch(r.art)}<b>${esc(r.name)}</b>
-      <span class="pencil">${c==='prep' ? `1 партия — ${money(recipeCost(r))}` : `на ${S.settings.people} чел. — ${money(mealCost(r))}`}</span></a>`).join('');
+      <span class="pencil">${c==='prep' ? `1 партия — ${money(recipeCost(r))}` : `на ${S.settings.people} чел. — ${money(mealCost(r))}`}</span>${tagsHtml(r.tags)}</a>`).join('');
     h += `</div>`;
   }
   return h;
@@ -232,6 +287,7 @@ function vRecipe(id){
     ${sketch(r.art,'big')}
     <h1>${esc(r.name)}</h1>
     <p class="pencil">${RCATS[r.cat]}${prep ? '' : ` · на ${r.serves} порц.`}${r.time ? ` · ${r.time} мин` : ''}</p>
+    ${tagsHtml(r.tags)}
     <table class="tbl"><thead><tr><th>Продукт</th><th class="r">Кол-во</th><th class="r">Цена</th></tr></thead><tbody>
     ${r.items.map(it => `<tr><td>${isPrepRef(it.ref) ? `<a href="#recipe/${it.ref.slice(2)}">${esc(refName(it.ref))}</a>` : esc(refName(it.ref))}</td>
       <td class="r">${fq(it.qty)} ${esc(refUnit(it.ref))}</td><td class="r">${fmt(itemCost(it))}</td></tr>`).join('')}
@@ -366,20 +422,20 @@ function addFromLib(id, src=LIB, depth=0){
     }
     items.push({ ref:p.id, qty });
   }
-  S.recipes.push({ id: R(lr.id) ? uid() : lr.id, name:lr.name, cat: RCATS[lr.cat] ? lr.cat : 'main', serves: lr.serves || 4, art: ART[lr.art] ? lr.art : 'pot', time: lr.time || '', steps: lr.steps || '', items });
+  S.recipes.push({ id: R(lr.id) ? uid() : lr.id, name:lr.name, cat: RCATS[lr.cat] ? lr.cat : 'main', serves: lr.serves || 4, art: ART[lr.art] ? lr.art : 'pot', time: lr.time || '', steps: lr.steps || '', items, ...(lr.tags ? { tags:[...lr.tags] } : {}) });
   save();
   return added;
 }
 function libList(){
   const q = normName(libState.q);
-  const order = ['breakfast','main','snack','prep'];
-  return [...LIB.recipes].sort((x,y) => order.indexOf(x.cat) - order.indexOf(y.cat)).filter(lr => (libState.cat === 'all' || lr.cat === libState.cat) && (!q || normName(lr.name).includes(q) || lr.items.some(([ref]) => normName(libRefName(ref)).includes(q))));
+  const order = ['breakfast','main','sweet','snack','drink','prep'];
+  return [...LIB.recipes].sort((x,y) => order.indexOf(x.cat) - order.indexOf(y.cat)).filter(lr => (libState.cat === 'all' || lr.cat === libState.cat || (libState.cat === 'healthy' && lr.set === 'healthy')) && (!q || normName(lr.name).includes(q) || lr.items.some(([ref]) => normName(libRefName(ref)).includes(q))));
 }
 function libFactor(lr){ return lr.cat === 'prep' ? 1 : S.settings.people / (lr.serves || 4); }
 function vLibrary(){
   let h = `<a class="back" href="#recipes">← мои рецепты</a>` + header('Книга рецептов');
   h += `<p class="pencil">Простые домашние блюда из продуктов, которые легко найти. Цены — по вашим ценам из тетради, а где их нет — примерные.</p>`;
-  h += `<div class="chips">${[['all','Все'],...Object.entries(RCATS)].map(([k,v]) => `<button class="chip ${libState.cat===k?'on':''}" data-act="libcat" data-c="${k}">${v}</button>`).join('')}</div>`;
+  h += `<div class="chips">${[['all','Все'],['healthy','★ Полезная подборка'],...Object.entries(RCATS)].map(([k,v]) => `<button class="chip ${libState.cat===k?'on':''}" data-act="libcat" data-c="${k}">${v}</button>`).join('')}</div>`;
   h += `<input class="ink-in search" data-f="libq" value="${esc(libState.q)}" placeholder="Поиск: курица, тыква, суп…">`;
   return h + `<div id="libgrid">${libGrid()}</div>`;
 }
@@ -389,7 +445,7 @@ function libGrid(){
   h += `<div class="grid">` + list.map((lr,i) => { const has = inBook(lr);
     return `<div class="rcard lib ${has?'has':''}" style="--tilt:${(i%3-1)*0.8}deg">
       <button class="plain" data-act="libview" data-id="${lr.id}">${sketch(lr.art)}<b>${esc(lr.name)}</b>
-      <span class="pencil">${lr.cat==='prep' ? `партия ≈ ${money(libCost(lr))}` : `на ${S.settings.people} чел. ≈ ${money(libCost(lr)*libFactor(lr))}`}${lr.time ? ` · ${lr.time} мин` : ''}</span></button>
+      <span class="pencil">${lr.cat==='prep' ? `партия ≈ ${money(libCost(lr))}` : `на ${S.settings.people} чел. ≈ ${money(libCost(lr)*libFactor(lr))}`}${lr.time ? ` · ${lr.time} мин` : ''}</span>${tagsHtml(lr.tags)}</button>
       ${has ? `<span class="inbook">✓ в тетради</span>` : `<button class="btn small" data-act="libadd" data-id="${lr.id}">+ В тетрадь</button>`}</div>`; }).join('') + `</div>`;
   if(list.some(lr => !inBook(lr))) h += `<div class="tools"><button class="btn ghost" data-act="liball">Добавить все из списка</button></div>`;
   return h;
@@ -458,7 +514,18 @@ function drawRecipeForm(){
 }
 
 function settingsForm(){
+  const sl = S.settings.slots;
   openModal(`<h2>Настройки</h2>
+    <h3>Приёмы пищи</h3>
+    <p class="pencil">Галочка — приём есть в плане. Стрелками можно переставить (например, кофе — после завтрака). «Чел.» — сколько человек в этом приёме, пусто = вся семья.</p>
+    <div class="slots">${sl.map((x, i) => `<div class="slotrow ${x.on ? '' : 'off'}">
+      <button class="box" data-act="slottoggle" data-id="${x.id}" aria-label="Включить или выключить">${x.on ? '✓' : ''}</button>
+      <input class="ink-in" data-slotf="name" data-sid="${x.id}" value="${esc(x.name)}">
+      <span class="mv"><button class="mini-btn" data-act="slotmove" data-id="${x.id}" data-dir="-1" ${i ? '' : 'disabled'} aria-label="Выше">↑</button><button class="mini-btn" data-act="slotmove" data-id="${x.id}" data-dir="1" ${i < sl.length-1 ? '' : 'disabled'} aria-label="Ниже">↓</button><button class="mini-btn x" data-act="slotdel" data-id="${x.id}" aria-label="Удалить">×</button></span>
+      <div class="subs"><label class="sub">что ставить: <select class="ink-sel" data-slotf="cat" data-sid="${x.id}">${MEAL_CATS.map(c => `<option value="${c}" ${c===x.cat?'selected':''}>${RCATS[c]}</option>`).join('')}</select></label>
+      <label class="sub">чел.: <input class="ink-in w2" inputmode="numeric" data-slotf="people" data-sid="${x.id}" value="${x.people || ''}" placeholder="${S.settings.people}"></label>
+      <label class="sub"><input type="checkbox" data-slotf="light" data-sid="${x.id}" ${x.light ? 'checked' : ''}> лёгкий</label></div></div>`).join('')}</div>
+    <button class="btn small ghost" data-act="slotadd">+ приём пищи</button>
     <label class="fld">Валюта<input class="ink-in" data-set="currency" value="${esc(S.settings.currency)}"></label>
     <h3>Резервная копия</h3>
     <p class="pencil">Данные хранятся только в этом браузере. Сохраняйте копию, чтобы не потерять или перенести на другой телефон.</p>
@@ -478,7 +545,19 @@ const ACT = {
   noop(){},
   settings: settingsForm,
   close: closeModal,
-  autofill(){ if(confirm('Разложить блюда на неделю вперемешку? Текущий план заменится.')){ S.plan = {}; autofill(S, true); save(); render(); } },
+  autofill(){
+    if(!confirm('Разложить блюда на неделю вперемешку, чтобы уложиться в бюджет? Текущий план заменится.')) return;
+    autofill(); save(); render();
+    const t = weekTotal(); toast(t <= S.settings.budget ? `Готово: ${money(t)} из ${money(S.settings.budget)}` : `Не уложились: ${money(t)}. Добавьте блюда подешевле`);
+  },
+  adddish(el){ const k = el.dataset.key; (S.plan[k] ||= []).push(''); render(); },
+  deldish(el){ const k = el.dataset.key; S.plan[k]?.splice(+el.dataset.i, 1); if(!S.plan[k]?.length) delete S.plan[k]; save(); render(); },
+  slottoggle(el){ const sl = S.settings.slots.find(x => x.id === el.dataset.id); sl.on = !sl.on; save(); render(); settingsForm(); },
+  slotmove(el){ const a = S.settings.slots, i = a.findIndex(x => x.id === el.dataset.id), j = i + (+el.dataset.dir);
+    if(j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; save(); render(); settingsForm(); },
+  slotdel(el){ const sl = S.settings.slots.find(x => x.id === el.dataset.id); if(!confirm(`Удалить приём «${sl.name}»?`)) return;
+    S.settings.slots = S.settings.slots.filter(x => x !== sl); for(const k in S.plan) if(k.endsWith('-'+sl.id)) delete S.plan[k]; save(); render(); settingsForm(); },
+  slotadd(){ S.settings.slots.push({ id:uid(), name:'Перекус', cat:'snack', on:true, light:true }); save(); render(); settingsForm(); },
   clearplan(){ if(confirm('Очистить план недели?')){ S.plan = {}; save(); render(); } },
   newrecipe(){ recipeForm({ id:uid(), name:'', cat:'main', serves:S.settings.people, art:'pot', time:'', items:[{ref:'',qty:0}], steps:'' }); },
   editrecipe(el){ recipeForm(R(el.dataset.id)); },
@@ -549,7 +628,15 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const t = e.target, d = t.dataset;
-  if(d.slot){ if(t.value) S.plan[d.slot] = t.value; else delete S.plan[d.slot]; save(); render(); return; }
+  if(d.slot){ const a = S.plan[d.slot] ||= [], i = +d.i || 0;
+    if(t.value) a[i] = t.value; else a.splice(i, 1);
+    S.plan[d.slot] = a.filter(Boolean); if(!S.plan[d.slot].length) delete S.plan[d.slot]; save(); render(); return; }
+  if(d.slotf){ const sl = S.settings.slots.find(x => x.id === d.sid); if(!sl) return;
+    if(d.slotf === 'name') sl.name = t.value.trim() || sl.name;
+    if(d.slotf === 'people') sl.people = Math.max(0, Math.round(num(t.value))) || undefined;
+    if(d.slotf === 'cat') sl.cat = t.value;
+    if(d.slotf === 'light') sl.light = t.checked;
+    save(); render(); return; }
   if(d.f === 'budget'){ S.settings.budget = Math.max(0, num(t.value)); save(); render(); return; }
   if(d.f === 'people'){ S.settings.people = Math.max(1, Math.round(num(t.value)) || 1); save(); render(); return; }
   if(d.price){ const p = P(d.price); if(p){ p.price = Math.max(0, num(t.value)); delete p.approx; save(); t.value = fmt(p.price);
@@ -597,6 +684,8 @@ function syncDraft(t){
 
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && draft) closeModal(); });
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0,0); });
+if(fresh) autofill(1);
+save();
 render();
 
 if('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -91,7 +91,7 @@ textarea.ink-in{border:1.5px dashed var(--ink2);border-radius:4px;line-height:1.
 .day{margin:20px 0 6px}
 .day h2{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:2px;margin-bottom:4px}
 .daysum{font:20px var(--write);color:var(--pencil)}
-.meal{display:grid;grid-template-columns:62px 1fr auto 18px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px dashed rgba(35,65,154,.25)}
+.meal{display:grid;grid-template-columns:66px 1fr auto 40px;align-items:center;gap:6px;padding:3px 0;border-bottom:1px dashed rgba(35,65,154,.25)}
 .mname{font:20px var(--hand);color:var(--pencil)}
 .ink-sel{font:inherit;font-size:18px;color:var(--ink);background:transparent;border:0;border-bottom:1.5px dashed transparent;padding:3px 2px;
   width:100%;min-width:0;-webkit-appearance:none;appearance:none;text-overflow:ellipsis;border-radius:0}
@@ -199,3 +199,26 @@ textarea.ink-in{border:1.5px dashed var(--ink2);border-radius:4px;line-height:1.
 .rcard.has{opacity:.75}
 .inbook{font:700 19px var(--hand);color:var(--green)}
 .sheet .sketch.big{width:150px;height:125px}
+
+/* приёмы пищи */
+.meal.extra{border-bottom-style:dotted}
+.meal.extra .ink-sel{font-size:17px}
+.mname{line-height:1}
+.mname small{display:block;font-size:15px}
+.acts{display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.mini-btn{background:none;border:1.5px solid var(--ink2);color:var(--ink);font:700 18px/1 var(--hand);width:22px;height:22px;padding:0;cursor:pointer;
+  border-radius:255px 15px 225px 15px/15px 225px 15px 255px;display:inline-grid;place-items:center}
+.mini-btn.x{color:var(--red);border-color:var(--red)}
+.mini-btn:disabled{opacity:.25}
+.linkbtn{background:none;border:0;padding:0;font:inherit;color:var(--ink2);text-decoration:underline;cursor:pointer}
+.tags{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:2px}
+.tags i{font:15px/1 var(--hand);font-style:normal;color:#2f7d4a;border:1px solid rgba(47,125,74,.5);padding:2px 6px;border-radius:10px 4px 10px 4px;background:rgba(141,191,106,.12)}
+.recipe .tags{margin:-2px 0 6px}
+.slots{display:flex;flex-direction:column;gap:6px;margin:6px 0 10px}
+.slotrow{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:4px 8px;padding:6px 0;border-bottom:1px dashed rgba(35,65,154,.3)}
+.slotrow.off > .ink-in,.slotrow.off .subs{opacity:.45}
+.slotrow .box{background:none;cursor:pointer;padding:0}
+.slotrow .mv{display:flex;gap:4px}
+.slotrow .subs{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:2px 14px}
+.slotrow .sub{font:18px var(--hand);color:var(--pencil);display:flex;align-items:center;gap:5px}
+.slotrow .sub .ink-sel{width:auto;border-bottom-color:var(--ink2)}

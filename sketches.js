@@ -138,6 +138,27 @@ const ART = {
     <path d="M108 30 V86 M104 30 V42 Q104 46 108 46 Q112 46 112 42 V30 M108 30 V42"/>
     <path d="M10 32 Q14 30 14 40 V86 M10 32 V54 H14"/>
     ${h(30,72,36,66,6,7,0.8)}` },
+  pie: { name:'Пирог', svg:`
+    <ellipse cx="60" cy="80" rx="48" ry="9"/>
+    <path class="wash" fill="${WASH.bread}" d="M18 70 Q18 48 30 46 L74 40 Q92 40 98 56 L98 70 Q60 82 18 70 Z"/>
+    <path d="M18 70 Q60 82 98 70 M18 70 V56 Q20 44 34 44 L76 40 Q94 40 98 56 V70"/>
+    <path d="M34 44 L58 60 L98 56"/>
+    <path d="M58 60 V76"/>
+    <path class="wash" fill="${WASH.carrot}" d="M22 60 Q40 66 58 64 L58 68 Q40 70 20 64 Z" style="opacity:.35"/>
+    <path d="M40 50 l4 2 M50 46 l4 2 M66 46 l4 2 M80 46 l4 2"/>
+    <path class="steam" d="M54 28 q-4 -6 0 -11 q4 -5 0 -10 M68 26 q-4 -6 0 -11"/>
+    ${h(62,72,66,62,8,4.4,-0.3)}` },
+  cookies: { name:'Печенье', svg:`
+    <ellipse cx="60" cy="74" rx="50" ry="12"/>
+    <path class="wash" fill="${WASH.bread}" d="M24 64 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <path d="M24 64 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <path class="wash" fill="${WASH.bread}" d="M60 66 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <path d="M60 66 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <path class="wash" fill="${WASH.coffee}" d="M42 50 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <path d="M42 50 q0 -12 16 -12 q16 0 16 12 q0 8 -16 8 q-16 0 -16 -8z"/>
+    <circle cx="34" cy="62" r="1.6"/><circle cx="44" cy="60" r="1.6"/><circle cx="40" cy="66" r="1.6"/>
+    <circle cx="70" cy="62" r="1.6"/><circle cx="82" cy="64" r="1.6"/><circle cx="76" cy="68" r="1.6"/>
+    <circle cx="52" cy="47" r="1.6"/><circle cx="62" cy="45" r="1.6"/><circle cx="58" cy="52" r="1.6"/>` },
 };
 const ART_KEYS = Object.keys(ART);
 
