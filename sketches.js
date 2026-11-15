@@ -108,6 +108,36 @@ const ART = {
     <circle cx="96" cy="82" r="5"/><circle cx="100" cy="76" r="5"/>
     <path d="M36 44 q8 -6 16 -4 M40 54 q10 -2 18 -8"/>
     ${h(34,62,40,52,6,6,1)}` },
+  soup: { name:'Тарелка супа', svg:`
+    <path class="wash" fill="${WASH.tomato}" d="M26 50 Q60 60 94 50 Q60 42 26 50 Z"/>
+    <ellipse cx="60" cy="50" rx="44" ry="11"/>
+    <ellipse cx="60" cy="50" rx="34" ry="7"/>
+    <path d="M16 50 Q20 80 60 82 Q100 80 104 50"/>
+    <path d="M44 82 Q46 88 60 88 Q74 88 76 82"/>
+    <path class="leafs" d="M48 49 l3 -2 M62 51 l3 -2 M70 48 l3 -2 M54 52 l2 -2"/>
+    <path d="M90 44 L110 14"/><ellipse cx="86" cy="49" rx="7" ry="4" transform="rotate(-30 86 49)"/>
+    <path class="steam" d="M44 36 q-4 -6 0 -11 q4 -5 0 -10 M60 34 q-4 -6 0 -11 q4 -5 0 -10 M74 36 q-4 -6 0 -11"/>
+    ${h(72,78,82,60,5,3.6,-0.6)}` },
+  pancakes: { name:'Блинчики', svg:`
+    <ellipse cx="60" cy="82" rx="46" ry="8"/>
+    <path class="wash" fill="${WASH.bread}" d="M22 76 Q60 86 98 76 V46 Q60 56 22 46 Z"/>
+    <path d="M22 76 Q60 86 98 76 M22 70 Q60 80 98 70 M22 64 Q60 74 98 64 M22 58 Q60 68 98 58 M22 52 Q60 62 98 52"/>
+    <ellipse cx="60" cy="46" rx="38" ry="9"/>
+    <path d="M22 46 V76 M98 46 V76"/>
+    <path class="wash" fill="${WASH.yolk}" d="M48 44 q12 -8 24 0 q-2 6 -12 6 q-10 0 -12 -6z"/>
+    <path d="M48 44 q12 -8 24 0 q-2 6 -12 6 q-10 0 -12 -6z M70 48 q4 6 2 12"/>
+    <path class="steam" d="M50 30 q-4 -6 0 -11 q4 -5 0 -10 M66 28 q-4 -6 0 -11 q4 -5 0 -10"/>` },
+  plate: { name:'Тарелка с вилкой', svg:`
+    <ellipse cx="58" cy="58" rx="42" ry="22"/>
+    <ellipse cx="58" cy="57" rx="30" ry="14"/>
+    <path class="wash" fill="${WASH.bread}" d="M40 56 q4 -10 16 -8 q10 0 10 8 q-4 8 -14 8 q-10 0 -12 -8z"/>
+    <path d="M40 56 q4 -10 16 -8 q10 0 10 8 q-4 8 -14 8 q-10 0 -12 -8z"/>
+    <path class="wash" fill="${WASH.leaf}" d="M62 52 q8 -8 16 -2 q-4 8 -16 2z"/>
+    <path class="leafs" d="M62 52 q8 -8 16 -2 q-4 8 -16 2z M64 52 l12 -2"/>
+    <circle class="wash" fill="${WASH.tomato}" cx="72" cy="62" r="4"/><circle cx="72" cy="62" r="4"/>
+    <path d="M108 30 V86 M104 30 V42 Q104 46 108 46 Q112 46 112 42 V30 M108 30 V42"/>
+    <path d="M10 32 Q14 30 14 40 V86 M10 32 V54 H14"/>
+    ${h(30,72,36,66,6,7,0.8)}` },
 };
 const ART_KEYS = Object.keys(ART);
 

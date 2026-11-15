@@ -84,8 +84,10 @@ function seed(){
   return s;
 }
 
-function autofill(s){
-  const br = s.recipes.filter(r=>r.cat==='breakfast'), mn = s.recipes.filter(r=>r.cat==='main');
+const shuffle = a => { a = [...a]; for(let i=a.length-1; i>0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; };
+function autofill(s, mix){
+  let br = s.recipes.filter(r=>r.cat==='breakfast'), mn = s.recipes.filter(r=>r.cat==='main');
+  if(mix){ br = shuffle(br); mn = shuffle(mn); }
   for(let d=0; d<7; d++){
     if(br.length) s.plan[`${d}-0`] = br[d % br.length].id;
     if(mn.length){ s.plan[`${d}-1`] = mn[(d*2) % mn.length].id; s.plan[`${d}-2`] = mn[(d*2+1) % mn.length].id; }
@@ -149,8 +151,8 @@ function route(){ const [v, id] = (location.hash.slice(1) || 'week').split('/');
 
 function render(){
   const { v, id } = route();
-  const views = { week:vWeek, recipes:vRecipes, recipe:()=>vRecipe(id), products:vProducts, shop:vShop, prep:vPrep };
-  const tab = v === 'recipe' ? 'recipes' : v;
+  const views = { week:vWeek, recipes:vRecipes, recipe:()=>vRecipe(id), library:vLibrary, products:vProducts, shop:vShop, prep:vPrep };
+  const tab = v === 'recipe' || v === 'library' ? 'recipes' : v;
   $('#app').innerHTML = (views[v] || vWeek)();
   $('#tabs').innerHTML = TABS.map(([k,t,ic]) => `<a href="#${k}" class="tab tab-${k} ${k===tab?'on':''}">${icon(ic)}<span>${t}</span></a>`).join('');
 }
@@ -205,7 +207,10 @@ function vWeek(){
 
 /* --- Рецепты --- */
 function vRecipes(){
-  let h = header('Рецепты', `<button class="btn small" data-act="newrecipe">+ Новый</button>`);
+  let h = header('Рецепты', `<button class="btn small" data-act="newrecipe">+ Свой</button>`);
+  const fresh = LIB.recipes.filter(lr => !inBook(lr)).length;
+  h += `<a class="card libbanner" href="#library">${sketch('pancakes','float')}<h2>Книга рецептов</h2>
+    <p>${fresh ? `${fresh} недорогих домашних блюд — добавляйте в тетрадь одним нажатием →` : 'Все блюда из книги уже в тетради ✓'}</p></a>`;
   for(const c of ['breakfast','main','snack','prep']){
     const rs = S.recipes.filter(r => r.cat === c); if(!rs.length) continue;
     h += `<h2 class="sec">${RCATS[c]}</h2><div class="grid">`;
@@ -251,7 +256,7 @@ function vProducts(){
     const ps = S.products.filter(p => (p.cat || 'Другое') === c).sort((a,b) => a.name.localeCompare(b.name,'ru')); if(!ps.length) continue;
     h += `<h2 class="sec">${c}</h2><div class="plist">`;
     h += ps.map(p => `<div class="prow">
-      <button class="pname" data-act="editproduct" data-id="${p.id}">${esc(p.name)}<small>${fq(p.pack)} ${esc(p.unit)}${p.shop ? ' · ' + esc(p.shop) : ''}</small></button>
+      <button class="pname" data-act="editproduct" data-id="${p.id}">${esc(p.name)}<small>${fq(p.pack)} ${esc(p.unit)}${p.shop ? ' · ' + esc(p.shop) : ''}${p.approx ? ' · <span class="red">цена примерная — проверьте</span>' : ''}</small></button>
       <label class="price"><input class="ink-in w4" inputmode="decimal" data-price="${p.id}" value="${fmt(p.price)}"><small>${esc(S.settings.currency)}</small></label>
       <span class="pencil unitp">${unitLine(p)}</span></div>`).join('');
     h += `</div>`;
@@ -321,6 +326,87 @@ function vPrep(){
   return h;
 }
 
+/* --- Книга рецептов --- */
+const libState = { cat:'all', q:'' };
+const normName = s => String(s||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9]/g,'');
+// продукт из книги → продукт в тетради (по id или по названию)
+const localProduct = (id, src=LIB) => P(id) || S.products.find(p => normName(p.name) === normName(src.products[id]?.name));
+const inBook = (lr, src=LIB) => S.recipes.some(r => r.id === lr.id || normName(r.name) === normName(lr.name));
+function libCost(lr, src=LIB, depth=0){
+  return lr.items.reduce((s,[ref,q]) => {
+    if(ref.startsWith('r:')){ const pr = src.recipes.find(x => x.id === ref.slice(2)); return s + (pr && depth<5 ? libCost(pr, src, depth+1)*q : 0); }
+    const p = localProduct(ref, src) || src.products[ref]; return s + (p && p.pack ? p.price/p.pack*q : 0);
+  }, 0);
+}
+function libRefName(ref, src=LIB){
+  if(ref.startsWith('r:')) return src.recipes.find(x => x.id === ref.slice(2))?.name ?? '—';
+  return (localProduct(ref, src) || src.products[ref])?.name ?? ref;
+}
+function libRefUnit(ref, src=LIB){ return ref.startsWith('r:') ? 'партия' : ((localProduct(ref, src) || src.products[ref])?.unit ?? ''); }
+// Добавить рецепт (и нужные заготовки, продукты) в тетрадь. Возвращает имена новых продуктов.
+function addFromLib(id, src=LIB, depth=0){
+  const lr = src.recipes.find(x => x.id === id); if(!lr || depth > 5) return [];
+  const existing = S.recipes.find(r => r.id === lr.id || normName(r.name) === normName(lr.name));
+  if(existing) return [];
+  const added = [], items = [];
+  for(const [ref, qty] of lr.items){
+    if(ref.startsWith('r:')){
+      const pid = ref.slice(2); added.push(...addFromLib(pid, src, depth+1));
+      const pr = src.recipes.find(x => x.id === pid);
+      const local = pr && S.recipes.find(r => r.id === pr.id || normName(r.name) === normName(pr.name));
+      if(local) items.push({ ref:'r:'+local.id, qty });
+      continue;
+    }
+    let p = localProduct(ref, src);
+    if(!p){
+      const d = src.products[ref]; if(!d) continue;
+      p = { id: P(ref) ? uid() : ref, name:d.name, unit:d.unit, pack:d.pack, price:d.price, cat: PCATS.includes(d.cat) ? d.cat : 'Другое', shop:'', approx:true };
+      if(d.tip !== undefined) p.tip = d.tip;
+      S.products.push(p); added.push(p.name);
+    }
+    items.push({ ref:p.id, qty });
+  }
+  S.recipes.push({ id: R(lr.id) ? uid() : lr.id, name:lr.name, cat: RCATS[lr.cat] ? lr.cat : 'main', serves: lr.serves || 4, art: ART[lr.art] ? lr.art : 'pot', time: lr.time || '', steps: lr.steps || '', items });
+  save();
+  return added;
+}
+function libList(){
+  const q = normName(libState.q);
+  const order = ['breakfast','main','snack','prep'];
+  return [...LIB.recipes].sort((x,y) => order.indexOf(x.cat) - order.indexOf(y.cat)).filter(lr => (libState.cat === 'all' || lr.cat === libState.cat) && (!q || normName(lr.name).includes(q) || lr.items.some(([ref]) => normName(libRefName(ref)).includes(q))));
+}
+function libFactor(lr){ return lr.cat === 'prep' ? 1 : S.settings.people / (lr.serves || 4); }
+function vLibrary(){
+  let h = `<a class="back" href="#recipes">← мои рецепты</a>` + header('Книга рецептов');
+  h += `<p class="pencil">Простые домашние блюда из продуктов, которые легко найти. Цены — по вашим ценам из тетради, а где их нет — примерные.</p>`;
+  h += `<div class="chips">${[['all','Все'],...Object.entries(RCATS)].map(([k,v]) => `<button class="chip ${libState.cat===k?'on':''}" data-act="libcat" data-c="${k}">${v}</button>`).join('')}</div>`;
+  h += `<input class="ink-in search" data-f="libq" value="${esc(libState.q)}" placeholder="Поиск: курица, тыква, суп…">`;
+  return h + `<div id="libgrid">${libGrid()}</div>`;
+}
+function libGrid(){
+  const list = libList(); let h = '';
+  if(!list.length) return `<p class="pencil">Ничего не нашлось.</p>`;
+  h += `<div class="grid">` + list.map((lr,i) => { const has = inBook(lr);
+    return `<div class="rcard lib ${has?'has':''}" style="--tilt:${(i%3-1)*0.8}deg">
+      <button class="plain" data-act="libview" data-id="${lr.id}">${sketch(lr.art)}<b>${esc(lr.name)}</b>
+      <span class="pencil">${lr.cat==='prep' ? `партия ≈ ${money(libCost(lr))}` : `на ${S.settings.people} чел. ≈ ${money(libCost(lr)*libFactor(lr))}`}${lr.time ? ` · ${lr.time} мин` : ''}</span></button>
+      ${has ? `<span class="inbook">✓ в тетради</span>` : `<button class="btn small" data-act="libadd" data-id="${lr.id}">+ В тетрадь</button>`}</div>`; }).join('') + `</div>`;
+  if(list.some(lr => !inBook(lr))) h += `<div class="tools"><button class="btn ghost" data-act="liball">Добавить все из списка</button></div>`;
+  return h;
+}
+function libPreview(id){
+  const lr = LIB.recipes.find(x => x.id === id); if(!lr) return;
+  const has = inBook(lr), prep = lr.cat === 'prep';
+  openModal(`${sketch(lr.art,'big')}<h2 style="text-align:center">${esc(lr.name)}</h2>
+    <p class="pencil" style="text-align:center">${RCATS[lr.cat]}${prep ? '' : ` · на ${lr.serves} порц.`}${lr.time ? ` · ${lr.time} мин` : ''}</p>
+    <table class="tbl"><thead><tr><th>Продукт</th><th class="r">Кол-во</th></tr></thead><tbody>
+    ${lr.items.map(([ref,q]) => `<tr><td>${esc(libRefName(ref))}${!ref.startsWith('r:') && !localProduct(ref) ? ' <span class="pencil">(новый)</span>' : ''}</td><td class="r">${fq(q)} ${esc(libRefUnit(ref))}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="right">${prep ? 'Партия' : `На ${lr.serves} порц.`} ≈ <b class="hl">${money(libCost(lr))}</b></p>
+    <ol class="steps">${lr.steps.split('\n').filter(Boolean).map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+    <div class="tools">${has ? '<span class="inbook">✓ уже в тетради</span>' : `<button class="btn" data-act="libadd" data-id="${lr.id}">+ В тетрадь</button>`}<button class="btn ghost" data-act="close">Закрыть</button></div>`);
+}
+
 /* ---------- модальные окна ---------- */
 let draft = null;
 function openModal(html){ const m = $('#modal'); m.innerHTML = `<div class="sheet">${html}</div>`; m.hidden = false; document.body.classList.add('noscroll'); }
@@ -378,6 +464,9 @@ function settingsForm(){
     <p class="pencil">Данные хранятся только в этом браузере. Сохраняйте копию, чтобы не потерять или перенести на другой телефон.</p>
     <div class="tools"><button class="btn" data-act="export">Сохранить в файл</button>
     <label class="btn ghost">Загрузить из файла<input type="file" accept="application/json,.json" data-act-file="import" hidden></label></div>
+    <h3>Подборка рецептов</h3>
+    <p class="pencil">Файл с рецептами (например, который подготовит Claude) — добавится к вашим, ничего не сотрётся.</p>
+    <div class="tools"><label class="btn ghost">Добавить рецепты из файла<input type="file" accept="application/json,.json" data-act-file="pack" hidden></label></div>
     <h3>Начать заново</h3>
     <div class="tools"><button class="btn danger" data-act="reset">Вернуть пример</button><button class="btn ghost" data-act="close">Закрыть</button></div>`);
 }
@@ -386,9 +475,10 @@ function toast(t){ const el = $('#toast'); el.textContent = t; el.hidden = false
 
 /* ---------- события ---------- */
 const ACT = {
+  noop(){},
   settings: settingsForm,
   close: closeModal,
-  autofill(){ if(confirm('Расставить блюда по кругу на всю неделю? Текущий план заменится.')){ S.plan = {}; autofill(S); save(); render(); } },
+  autofill(){ if(confirm('Разложить блюда на неделю вперемешку? Текущий план заменится.')){ S.plan = {}; autofill(S, true); save(); render(); } },
   clearplan(){ if(confirm('Очистить план недели?')){ S.plan = {}; save(); render(); } },
   newrecipe(){ recipeForm({ id:uid(), name:'', cat:'main', serves:S.settings.people, art:'pot', time:'', items:[{ref:'',qty:0}], steps:'' }); },
   editrecipe(el){ recipeForm(R(el.dataset.id)); },
@@ -437,6 +527,18 @@ const ACT = {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `тетрадь-${new Date().toISOString().slice(0,10)}.json`; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
+  libcat(el){ libState.cat = el.dataset.c; render(); },
+  libview(el){ libPreview(el.dataset.id); },
+  libadd(el){
+    const id = el.dataset.id, newP = addFromLib(id); closeModal(); render();
+    toast(newP.length ? `Добавлено! Новые продукты (${newP.length}) — проверьте цены` : 'Добавлено в тетрадь');
+  },
+  liball(){
+    const list = libList().filter(lr => !inBook(lr)); if(!list.length) return;
+    if(!confirm(`Добавить в тетрадь все ${list.length} рецепт(ов) из этого раздела?`)) return;
+    const newP = new Set(); list.forEach(lr => addFromLib(lr.id).forEach(p => newP.add(p)));
+    render(); toast(`Добавлено: ${list.length}` + (newP.size ? `, новых продуктов: ${newP.size} — проверьте цены` : ''));
+  },
   reset(){ if(confirm('Стереть все свои данные и вернуть пример?')){ S = seed(); save(); closeModal(); location.hash = 'week'; render(); } },
 };
 
@@ -450,12 +552,23 @@ document.addEventListener('change', e => {
   if(d.slot){ if(t.value) S.plan[d.slot] = t.value; else delete S.plan[d.slot]; save(); render(); return; }
   if(d.f === 'budget'){ S.settings.budget = Math.max(0, num(t.value)); save(); render(); return; }
   if(d.f === 'people'){ S.settings.people = Math.max(1, Math.round(num(t.value)) || 1); save(); render(); return; }
-  if(d.price){ const p = P(d.price); if(p){ p.price = Math.max(0, num(t.value)); save(); t.value = fmt(p.price);
+  if(d.price){ const p = P(d.price); if(p){ p.price = Math.max(0, num(t.value)); delete p.approx; save(); t.value = fmt(p.price);
+    t.closest('.prow')?.querySelector('.pname .red')?.remove();
     const u = t.closest('.prow')?.querySelector('.unitp'); if(u) u.textContent = unitLine(p); } return; }
   if(d.set){ S.settings[d.set] = t.value.trim() || 'R$'; save(); render(); return; }
   if(d.actFile === 'import'){
     const file = t.files[0]; if(!file) return;
-    file.text().then(txt => { const x = JSON.parse(txt); if(!x.products || !x.recipes) throw 0; S = x; S.plan ||= {}; S.bought ||= {}; save(); closeModal(); render(); toast('Данные загружены'); })
+    file.text().then(txt => { const x = JSON.parse(txt); if(!x.products || !x.recipes) throw 0;
+      if(!confirm('Заменить все данные в тетради данными из файла?')) return; S = x; S.plan ||= {}; S.bought ||= {}; save(); closeModal(); render(); toast('Данные загружены'); })
+      .catch(() => toast('Не получилось прочитать файл'));
+    return;
+  }
+  if(d.actFile === 'pack'){
+    const file = t.files[0]; if(!file) return;
+    file.text().then(txt => { const x = JSON.parse(txt); if(!Array.isArray(x.recipes)) throw 0;
+      const src = { products: x.products || {}, recipes: x.recipes }; let n = 0; const newP = new Set();
+      for(const lr of x.recipes){ if(!inBook(lr, src)){ addFromLib(lr.id, src).forEach(p => newP.add(p)); n++; } }
+      closeModal(); location.hash = 'recipes'; render(); toast(`Добавлено рецептов: ${n}` + (newP.size ? `, новых продуктов: ${newP.size}` : '')); })
       .catch(() => toast('Не получилось прочитать файл'));
     return;
   }
@@ -465,6 +578,7 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => {
   const t = e.target, d = t.dataset;
   if(d.f === 'notes'){ S.notes = t.value; save(); return; }
+  if(d.f === 'libq'){ libState.q = t.value; const g = $('#libgrid'); if(g) g.innerHTML = libGrid(); return; }
   if(draft && (d.d || d.k)) syncDraft(t);
   // живой пересчёт стоимости строки и итога, без перерисовки (чтобы не терять фокус)
   if(draft && draft.kind === 'recipe' && (d.k === 'qty' || d.d === 'serves')){

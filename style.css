@@ -184,3 +184,18 @@ textarea.ink-in{border:1.5px dashed var(--ink2);border-radius:4px;line-height:1.
 #toast[hidden]{display:none}
 
 @media (min-width:600px){ :root{--left:64px} h1{font-size:46px} }
+
+/* книга рецептов */
+.libbanner{display:block;text-decoration:none;color:var(--ink);padding-right:110px;min-height:96px;background:#fff8e6}
+.libbanner .sketch.float{top:8px}
+.libbanner h2{margin-bottom:4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{font:700 19px/1 var(--hand);color:var(--ink);background:transparent;border:1.5px dashed var(--ink2);padding:5px 10px;cursor:pointer;
+  border-radius:255px 15px 225px 15px/15px 225px 15px 255px}
+.chip.on{background:var(--marker);border-style:solid}
+.search{margin:4px 0 14px}
+.plain{background:none;border:0;padding:0;font:inherit;color:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;text-align:center}
+.rcard.lib{gap:8px}
+.rcard.has{opacity:.75}
+.inbook{font:700 19px var(--hand);color:var(--green)}
+.sheet .sketch.big{width:150px;height:125px}
