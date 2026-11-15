@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <pattern id="g" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#c9dcef" stroke-width="2"/></pattern>
+    <filter id="p"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="6"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#fbf7ec"/>
+  <rect width="512" height="512" rx="96" fill="url(#g)"/>
+  <path d="M84 0V512" stroke="#e7a3a3" stroke-width="6"/>
+  <g filter="url(#p)" fill="none" stroke="#4d4740" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 260 Q156 400 280 404 Q404 400 410 260 Z" fill="#cfe3f2" fill-opacity=".7"/>
+    <ellipse cx="280" cy="258" rx="132" ry="34" fill="#fffdf6"/>
+    <path d="M226 404 Q230 430 280 430 Q330 430 334 404"/>
+    <circle cx="240" cy="250" r="16" fill="#f2c94c" fill-opacity=".7"/>
+    <circle cx="290" cy="244" r="16" fill="#f2c94c" fill-opacity=".7"/>
+    <circle cx="334" cy="254" r="14" fill="#f2c94c" fill-opacity=".7"/>
+    <path d="M230 190 q-14 -22 0 -40 q14 -18 0 -36 M280 182 q-14 -22 0 -40 q14 -18 0 -36 M330 190 q-14 -22 0 -40" stroke-width="7" opacity=".6"/>
+  </g>
+  <path d="M120 470 Q250 455 420 466" stroke="#23419a" stroke-width="8" fill="none" stroke-linecap="round"/>
+</svg>
