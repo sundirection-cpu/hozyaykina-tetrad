@@ -308,7 +308,7 @@ function vRecipe(id){
 function vProducts(){
   let h = header('Цены', `<button class="btn small" data-act="newproduct">+ Продукт</button>`);
   h += `<p class="pencil">Впишите цену упаковки — рецепты и бюджет пересчитаются сами.</p>
-    <div class="tools"><label class="btn small ghost">⇩ Цены из магазина (файл)<input type="file" accept="application/json,.json" data-act-file="prices" hidden></label></div>`;
+    <div class="tools"><button class="btn small" data-act="fetchprices">⇩ Свежие цены Extra</button><label class="btn small ghost">Цены из файла<input type="file" accept="application/json,.json" data-act-file="prices" hidden></label></div>`;
   for(const c of PCATS){
     const ps = S.products.filter(p => (p.cat || 'Другое') === c).sort((a,b) => a.name.localeCompare(b.name,'ru')); if(!ps.length) continue;
     h += `<h2 class="sec">${c}</h2><div class="plist">`;
@@ -486,12 +486,14 @@ function findProduct(x){
     || (x.aliases || []).map(a => S.products.find(p => normName(p.name) === normName(a))).find(Boolean) || null;
 }
 function pricePreview(data){
+  const taken = new Set();
   const rows = (data.prices || []).map((x, i) => {
-    const p = findProduct(x), price = num(x.price);
+    let p = findProduct(x); const price = num(x.price);
+    const dup = p && taken.has(p.id); if(p) taken.add(p.id);
     const pack = p ? convQty(num(x.pack), x.unit, p.unit) : num(x.pack);
     const ok = price > 0 && pack > 0;
     const same = p && Math.abs(p.price - price) < 0.005 && Math.abs(p.pack - pack) < 1e-9;
-    return { i, x, p, price, pack, ok, on: !!p && ok && !same, same };
+    return { i, x, p, price, pack, ok, on: !!p && ok && !same && !dup, same };
   });
   priceDraft = { rows, source: data.source || '', date: data.date || '' };
   drawPricePreview();
@@ -596,6 +598,12 @@ function toast(t){ const el = $('#toast'); el.textContent = t; el.hidden = false
 /* ---------- события ---------- */
 const ACT = {
   noop(){},
+  fetchprices(){
+    fetch('prices/latest.json?' + Date.now(), { cache:'no-store' })
+      .then(r => { if(!r.ok) throw 0; return r.json(); })
+      .then(x => { if(!Array.isArray(x.prices)) throw 0; pricePreview(x); })
+      .catch(() => toast('Не удалось загрузить цены — нужен интернет'));
+  },
   applyprices(){
     const d = priceDraft; if(!d) return; let upd = 0, add = 0;
     for(const r of d.rows){

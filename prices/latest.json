@@ -1,0 +1,37 @@
+{
+ "type": "prices",
+ "source": "Extra (iFood)",
+ "date": "2026-11-16",
+ "prices": [
+  {"id":"chicken","name":"Куриное филе","aliases":["Курица","Куриная грудка","Филе куриное","Грудка куриная"],"storeName":"Peito de frango resfriado 700 g — 17,90","pack":700,"unit":"г","price":17.90},
+  {"id":"chickcut","name":"Куриное филе, нарезанное","aliases":["Курица нарезанная"],"storeName":"Peito de frango 700 g (целое, нарезать самой) — 17,90","pack":0.7,"unit":"кг","price":17.90},
+  {"id":"thighs","name":"Куриные бёдра","aliases":["Бедро куриное","Куриные бедра","Бёдра куриные"],"storeName":"Sobrecoxa de Frango Natto 700 g — 15,50","pack":0.7,"unit":"кг","price":15.50},
+  {"id":"eggs","name":"Яйца","aliases":["Яйцо"],"storeName":"Ovos Brancos Grandes, 20 шт — 12,00","pack":20,"unit":"шт","price":12.00},
+  {"id":"milk","name":"Молоко","storeName":"Leite UHT Integral Quatá 1 л — 5,83","pack":1,"unit":"л","price":5.83},
+  {"id":"butter","name":"Сливочное масло","aliases":["Масло сливочное"],"storeName":"Manteiga sem sal Davaca 200 g — 15,49","pack":200,"unit":"г","price":15.49},
+  {"id":"cheese","name":"Сыр (муссарела)","aliases":["Сыр","Сыр прато","Сыр нарезка"],"storeName":"Queijo Prato fatiado Président 300 g — 24,90","pack":300,"unit":"г","price":24.90},
+  {"id":"oats","name":"Овсянка","aliases":["Овсяные хлопья","Овёс"],"storeName":"Aveia em flocos Quaker 450 g — 10,19","pack":450,"unit":"г","price":10.19},
+  {"id":"rice","name":"Рис","aliases":["Рис белый","Рис пропаренный"],"storeName":"Arroz parboilizado Tio João 1 кг — 4,29 (в другом заказе 5,99; Urbano — 5,29)","pack":1,"unit":"кг","price":4.29},
+  {"id":"pasta","name":"Макароны","aliases":["Спагетти","Паста"],"storeName":"Espaguete fino Vitarella 400 g — 2,49 (Parafuso Dona Benta 500 g — 3,19)","pack":400,"unit":"г","price":2.49},
+  {"id":"beans","name":"Фасоль","aliases":["Фасоль карьока"],"storeName":"Feijão carioca Kicaldo 1 кг — 8,79","pack":1,"unit":"кг","price":8.79},
+  {"id":"lentils","name":"Чечевица","storeName":"Lentilha Kicaldo 500 g — 13,49","pack":500,"unit":"г","price":13.49},
+  {"id":"coffee","name":"Кофе","storeName":"Café São Braz Família 250 g — 16,49","pack":250,"unit":"г","price":16.49},
+  {"id":"sugar","name":"Сахар","aliases":["Сахар демерара"],"storeName":"Açúcar demerara Taeq 1 кг — 4,49","pack":1,"unit":"кг","price":4.49},
+  {"id":"pbutter","name":"Арахисовая паста","storeName":"Pasta de amendoim integral Qualitá 500 g — 22,09","pack":500,"unit":"г","price":22.09},
+  {"id":"tomatopaste","name":"Томатная паста","aliases":["Томатный экстракт"],"storeName":"Extrato de tomate Quero 320 g — 3,99","pack":320,"unit":"г","price":3.99},
+  {"id":"peas","name":"Горошек консерв.","aliases":["Горошек","Зелёный горошек","Горошек консервированный"],"storeName":"Ervilha Quero lata 170 g — 4,69","pack":1,"unit":"банка","price":4.69},
+  {"id":"tuna","name":"Тунец консерв.","aliases":["Тунец","Тунец консервированный"],"storeName":"Atum ralado ao natural Qualitá 120 g — 6,74 (в другом заказе 7,64)","pack":1,"unit":"банка","price":6.74},
+  {"id":"sardines","name":"Сардины, 75 г","aliases":["Сардины","Шпроты","Сардины в томате"],"storeName":"Sardinha com molho de tomate Gomes da Costa — 6,20","pack":1,"unit":"банка","price":6.20},
+  {"id":"bread","name":"Хлеб (буханка)","aliases":["Хлеб","Хлеб молочный"],"storeName":"Pão de leite Bella Vita 450 g — 6,29","pack":1,"unit":"шт","price":6.29},
+  {"id":"onion","name":"Лук","aliases":["Лук репчатый"],"storeName":"Cebola fresca, на вес (314 g за 3,28) — 10,45 за кг","pack":1,"unit":"кг","price":10.45},
+
+  {"name":"Горошек с кукурузой","storeName":"Ervilha e milho Quero lata 170 g — 4,59","pack":1,"unit":"банка","price":4.59,"cat":"Хлеб и бакалея"},
+  {"name":"Йогурт питьевой Danone Zero","storeName":"Iogurte líquido batido zero Danone 1,2 кг — 23,99","pack":1200,"unit":"г","price":23.99,"cat":"Молочное и яйца"},
+  {"name":"Крекеры цельнозерновые","storeName":"Biscoito cream cracker integral Pilar 420 g — 5,99","pack":420,"unit":"г","price":5.99,"cat":"Хлеб и бакалея"},
+  {"name":"Гранола готовая","storeName":"Granola Naturale passas e mel 1 кг — 25,99","pack":1000,"unit":"г","price":25.99,"cat":"Хлеб и бакалея"},
+  {"name":"Каппеллетти с мясом","storeName":"Capeletti Massa Leve carne 400 g — 16,49","pack":400,"unit":"г","price":16.49,"cat":"Мясо и рыба"},
+  {"name":"Наггетсы","storeName":"Nuggets crocante Sadia 300 g — 8,75","pack":300,"unit":"г","price":8.75,"cat":"Мясо и рыба"},
+  {"name":"Гуавовый джем","storeName":"Doce cremoso Tambaú goiaba 280 g — 4,89","pack":280,"unit":"г","price":4.89,"cat":"Хлеб и бакалея"},
+  {"name":"Соль","storeName":"Sal refinado Qualitá 1 кг — 1,97","pack":1,"unit":"кг","price":1.97,"cat":"Хлеб и бакалея"}
+ ]
+}
