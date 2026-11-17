@@ -222,3 +222,10 @@ textarea.ink-in{border:1.5px dashed var(--ink2);border-radius:4px;line-height:1.
 .slotrow .subs{grid-column:2 / 4;display:flex;flex-wrap:wrap;gap:2px 14px}
 .slotrow .sub{font:18px var(--hand);color:var(--pencil);display:flex;align-items:center;gap:5px}
 .slotrow .sub .ink-sel{width:auto;border-bottom-color:var(--ink2)}
+
+/* предпросмотр цен из магазина */
+.pp{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:start;padding:8px 0;border-bottom:1px dashed rgba(35,65,154,.3);cursor:pointer}
+.pp input{width:20px;height:20px;margin-top:4px;accent-color:var(--ink)}
+.pp small{display:block;color:var(--pencil);font:17px var(--hand)}
+.pp .ppw{display:block;font-size:17px;line-height:1.35}
+.pp.off{opacity:.6;cursor:default}

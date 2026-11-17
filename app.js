@@ -307,7 +307,8 @@ function vRecipe(id){
 /* --- Цены --- */
 function vProducts(){
   let h = header('Цены', `<button class="btn small" data-act="newproduct">+ Продукт</button>`);
-  h += `<p class="pencil">Впишите цену упаковки — рецепты и бюджет пересчитаются сами.</p>`;
+  h += `<p class="pencil">Впишите цену упаковки — рецепты и бюджет пересчитаются сами.</p>
+    <div class="tools"><label class="btn small ghost">⇩ Цены из магазина (файл)<input type="file" accept="application/json,.json" data-act-file="prices" hidden></label></div>`;
   for(const c of PCATS){
     const ps = S.products.filter(p => (p.cat || 'Другое') === c).sort((a,b) => a.name.localeCompare(b.name,'ru')); if(!ps.length) continue;
     h += `<h2 class="sec">${c}</h2><div class="plist">`;
@@ -463,10 +464,62 @@ function libPreview(id){
     <div class="tools">${has ? '<span class="inbook">✓ уже в тетради</span>' : `<button class="btn" data-act="libadd" data-id="${lr.id}">+ В тетрадь</button>`}<button class="btn ghost" data-act="close">Закрыть</button></div>`);
 }
 
+/* --- Обновление цен из файла магазина ---
+   Формат: { type:"prices", source:"Extra", date:"2026-11-16",
+             prices:[{ id?, name, aliases?:[..], storeName, pack, unit, price, cat? }] }
+   Единицу продукта в тетради не меняем (на ней держатся рецепты): размер упаковки
+   переводим в неё (кг↔г, л↔мл). Ничего не меняется без галочки. */
+const UNIT_BASE = { 'кг':['кг',1], 'г':['кг',0.001], 'л':['л',1], 'мл':['л',0.001] };
+function convQty(q, from, to){
+  if(from === to) return q;
+  const a = UNIT_BASE[from], b = UNIT_BASE[to];
+  return a && b && a[0] === b[0] ? q * a[1] / b[1] : null;
+}
+function perBase(price, pack, unit){
+  if(!(pack > 0)) return '';
+  const b = UNIT_BASE[unit];
+  return b ? `${fmt(price / pack / b[1])} за ${b[0]}` : `${fmt(price / pack)} за ${unit}`;
+}
+let priceDraft = null;
+function findProduct(x){
+  return (x.id && P(x.id)) || S.products.find(p => normName(p.name) === normName(x.name))
+    || (x.aliases || []).map(a => S.products.find(p => normName(p.name) === normName(a))).find(Boolean) || null;
+}
+function pricePreview(data){
+  const rows = (data.prices || []).map((x, i) => {
+    const p = findProduct(x), price = num(x.price);
+    const pack = p ? convQty(num(x.pack), x.unit, p.unit) : num(x.pack);
+    const ok = price > 0 && pack > 0;
+    const same = p && Math.abs(p.price - price) < 0.005 && Math.abs(p.pack - pack) < 1e-9;
+    return { i, x, p, price, pack, ok, on: !!p && ok && !same, same };
+  });
+  priceDraft = { rows, source: data.source || '', date: data.date || '' };
+  drawPricePreview();
+}
+function drawPricePreview(){
+  const d = priceDraft, cur = esc(S.settings.currency);
+  const found = d.rows.filter(r => r.p), fresh = d.rows.filter(r => !r.p);
+  const row = r => {
+    const x = r.x, p = r.p;
+    let what;
+    if(!r.ok) what = `<span class="red">не подходит: ${p ? `в тетради «${esc(p.unit)}», в магазине «${esc(x.unit)}»` : 'нет цены или упаковки'}</span>`;
+    else if(p) what = `было ${fmt(p.price)} ${cur} за ${fq(p.pack)} ${esc(p.unit)} <span class="pencil">(${perBase(p.price, p.pack, p.unit)})</span><br>
+      станет <b>${fmt(r.price)} ${cur} за ${fq(r.pack)} ${esc(p.unit)}</b> <span class="pencil">(${perBase(r.price, r.pack, p.unit)})</span>${r.same ? ' <span class="green">— без изменений</span>' : ''}`;
+    else what = `новый продукт: ${fmt(r.price)} ${cur} за ${fq(r.pack)} ${esc(x.unit)}`;
+    return `<label class="pp ${r.ok ? '' : 'off'}"><input type="checkbox" data-pi="${r.i}" ${r.on ? 'checked' : ''} ${r.ok ? '' : 'disabled'}>
+      <span><b>${esc(p ? p.name : x.name)}</b>${x.storeName ? `<small>${esc(x.storeName)}</small>` : ''}<span class="ppw">${what}</span></span></label>`;
+  };
+  openModal(`<h2>Цены из магазина</h2>
+    <p class="pencil">${esc(d.source)}${d.date ? ' · ' + esc(d.date) : ''}. Отметьте, что обновить — остальное останется как есть. Рецепты не меняются.</p>
+    ${found.length ? `<h3>Есть в тетради (${found.length})</h3>${found.map(row).join('')}` : ''}
+    ${fresh.length ? `<h3>Новые продукты (${fresh.length})</h3><p class="pencil">Добавятся в «Цены», только если отметите.</p>${fresh.map(row).join('')}` : ''}
+    <div class="tools"><button class="btn" data-act="applyprices">Обновить отмеченные</button><button class="btn ghost" data-act="close">Отмена</button></div>`);
+}
+
 /* ---------- модальные окна ---------- */
 let draft = null;
 function openModal(html){ const m = $('#modal'); m.innerHTML = `<div class="sheet">${html}</div>`; m.hidden = false; document.body.classList.add('noscroll'); }
-function closeModal(){ $('#modal').hidden = true; $('#modal').innerHTML = ''; draft = null; document.body.classList.remove('noscroll'); }
+function closeModal(){ $('#modal').hidden = true; $('#modal').innerHTML = ''; draft = null; priceDraft = null; document.body.classList.remove('noscroll'); }
 
 function productForm(p){
   draft = { kind:'product', ...p, tip: tipFor(p) };
@@ -543,6 +596,17 @@ function toast(t){ const el = $('#toast'); el.textContent = t; el.hidden = false
 /* ---------- события ---------- */
 const ACT = {
   noop(){},
+  applyprices(){
+    const d = priceDraft; if(!d) return; let upd = 0, add = 0;
+    for(const r of d.rows){
+      if(!r.on || !r.ok) continue;
+      if(r.p){ r.p.price = r.price; r.p.pack = r.pack; if(d.source) r.p.shop = d.source; delete r.p.approx; upd++; }
+      else { S.products.push({ id:uid(), name:r.x.name, unit: UNITS.includes(r.x.unit) ? r.x.unit : 'шт', pack:r.pack, price:r.price,
+        cat: PCATS.includes(r.x.cat) ? r.x.cat : 'Другое', shop:d.source }); add++; }
+    }
+    priceDraft = null; save(); closeModal(); render();
+    toast(`Обновлено цен: ${upd}` + (add ? `, новых продуктов: ${add}` : ''));
+  },
   settings: settingsForm,
   close: closeModal,
   autofill(){
@@ -650,6 +714,14 @@ document.addEventListener('change', e => {
       .catch(() => toast('Не получилось прочитать файл'));
     return;
   }
+  if(d.actFile === 'prices'){
+    const file = t.files[0]; if(!file) return;
+    file.text().then(txt => { const x = JSON.parse(txt); if(!Array.isArray(x.prices)) throw 0; pricePreview(x); })
+      .catch(() => toast('Это не файл с ценами'));
+    t.value = '';
+    return;
+  }
+  if(d.pi !== undefined && priceDraft){ const r = priceDraft.rows[+d.pi]; if(r) r.on = t.checked; return; }
   if(d.actFile === 'pack'){
     const file = t.files[0]; if(!file) return;
     file.text().then(txt => { const x = JSON.parse(txt); if(!Array.isArray(x.recipes)) throw 0;
